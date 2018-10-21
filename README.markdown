@@ -37,6 +37,8 @@ bibsonomy:
   # see http://api.altmetric.com/embeds.html for types and JavaScript
   # to enable them; empty value disables rendering
   altmetric_badge_type: 1
+  # empty value deactivates caching
+  cache_directory: cache
 ```
 
 You can get your BibSonomy API key from

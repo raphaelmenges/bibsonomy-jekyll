@@ -2,7 +2,7 @@
 require 'jekyll'
 require 'time'
 require 'bibsonomy/csl'
-
+require 'digest'
 
 #
 # Jekyll Tag to render posts from BibSonomy.
@@ -15,6 +15,8 @@ require 'bibsonomy/csl'
 #     COUNT is an integer, the number of posts to return
 #
 # Changes:
+# 2018-10-21
+# - add simple cache mechanism
 # 2018-10-13
 # - added document_link_prefix
 # 2018-10-08 (rja)
@@ -32,8 +34,31 @@ module Jekyll
     end
 
     def render(context)
+
+      # extract config
+      site = context.registers[:site]
+      bib_config = site.config['bibsonomy']
+
       # expand liquid variables
       rendered_input = Liquid::Template.parse(@input).render(context)
+
+      # check for cache
+      cache_directory = bib_config['cache_directory']
+      if not (cache_directory.nil? || cache_directory.empty?)
+
+        # name of cache file with path
+        rendered_input_hash = Digest::MD5.hexdigest(rendered_input)
+        cache_filepath = bib_config['cache_directory'] + '/' + rendered_input_hash + '.cache'
+
+        # check for cache
+        if File.exists? cache_filepath
+
+          # read html from cache file
+          File.open(cache_filepath, "r:UTF-8") do |f|
+            return f.read
+          end
+        end
+      end
 
       # parse parameters
       parts = rendered_input.split(/\s+/)
@@ -44,11 +69,7 @@ module Jekyll
       # everything else are the tags
       tags = parts
 
-      # extract config
-      site = context.registers[:site]
-
       # user name and API key for BibSonomy
-      bib_config = site.config['bibsonomy']
       csl = BibSonomy::CSL.new(bib_config['user'], bib_config['apikey'])
 
       # target directory for PDF documents
@@ -68,10 +89,16 @@ module Jekyll
       # set date to now
       context.registers[:page]["date"] = Time.new
 
+      # cache the resulting html
+      if not (cache_directory.nil? || cache_directory.empty?)
+        File.open(cache_filepath, "w:UTF-8") do |f| 
+          f.write html 
+        end 
+      end
+
       return html
     end
   end
-
 end
 
 Liquid::Template.register_tag('bibsonomy', Jekyll::BibSonomyPostList)
